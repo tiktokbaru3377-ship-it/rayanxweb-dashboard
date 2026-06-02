@@ -1,0 +1,22 @@
+@tailwindcss base;
+@tailwindcss components;
+@tailwindcss utilities;
+
+/* Custom Scrollbar Utilities for Modern SaaS Glassmorphism Dashboard Look */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
