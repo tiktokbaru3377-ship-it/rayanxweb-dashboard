@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useAuthStore } from './store/authStore';
-import LoginScreen from './pages/LoginScreen'; // Komponen form Anda
+import LoginScreen from './pages/Login'; // Komponen form Anda
 import DashboardLayout from './components/DashboardLayout'; // Halaman utama dashboard
 
 function App() {
