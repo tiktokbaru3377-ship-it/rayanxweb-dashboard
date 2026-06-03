@@ -4,7 +4,7 @@ import { useAuthStore, useAuthLoading, useAuthUser } from './store/useAuthStore.
 
 // PERBAIKAN: Impor tanpa ekstensi agar Vite yang mencarikan file aslinya di Vercel
 import Login from './pages/Login'; 
-import DashboardLayout from './components/DashboardLayout'; 
+import DashboardLayout from './components/CoreDashboardLayout'; 
 
 function App() {
   const user = useAuthUser();
