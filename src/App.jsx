@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
-// Hubungkan ke nama file baru secara eksplisit
+// Jalur store baru yang sudah sukses
 import { useAuthStore, useAuthLoading, useAuthUser } from './store/useAuthStore.js';
 
-import Login from './pages/Login.jsx'; 
-import DashboardLayout from './components/DashboardLayout.jsx'; 
+// PERBAIKAN: Impor tanpa ekstensi agar Vite yang mencarikan file aslinya di Vercel
+import Login from './pages/Login'; 
+import DashboardLayout from './components/DashboardLayout'; 
 
 function App() {
   const user = useAuthUser();
@@ -11,10 +12,12 @@ function App() {
   const initAuthListener = useAuthStore((state) => state.initAuthListener);
 
   useEffect(() => {
+    // Memantau token Firebase secara real-time
     const unsubscribe = initAuthListener();
     return () => unsubscribe(); 
   }, [initAuthListener]);
 
+  // Loading Screen minimalis berkecepatan tinggi
   if (isLoading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-[#020617] font-sans">
@@ -28,6 +31,7 @@ function App() {
     );
   }
 
+  // Pintu gerbang pembagi halaman dashboard vs login
   return user ? <DashboardLayout /> : <Login />;
 }
 
