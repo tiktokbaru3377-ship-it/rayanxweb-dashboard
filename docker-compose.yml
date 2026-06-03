@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  # REVERSE PROXY & CDN LAYER (Frontend Server)
+  rayanx-frontend-nginx:
+    image: nginx:alpine
+    container_name: rayanx_frontend_prod
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./dist:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - /etc/ssl/certs/rayanx_production.crt:/etc/ssl/certs/rayanx_production.crt:ro
+      - /etc/ssl/certs/rayanx_production.key:/etc/ssl/certs/rayanx_production.key:ro
+    depends_on:
+      - rayanx-api-backend
+    networks:
+      - rayanx-secure-mesh
+    restart: always
+
+  # API GATEWAY & WEBSOCKET EMULATOR CORE (Backend Server)
+  rayanx-api-backend:
+    image: node:20-alpine
+    container_name: rayanx_backend_node
+    environment:
+      - NODE_ENV=production
+      - MONGO_URI=mongodb://db_admin:SecuredPassword@rayanx-mongodb:2717/rayanx_mdm?authSource=admin
+      - REDIS_URL=redis://rayanx-redis:6379
+    volumes:
+      - ./backend:/app
+    working_dir: /app
+    command: npm run start:prod
+    networks:
+      - rayanx-secure-mesh
+    restart: always
+
+  # HIGH-PERFORMANCE REDIS BUFFER OVERFLOW
+  rayanx-redis:
+    image: redis:7-alpine
+    container_name: rayanx_redis_cache
+    command: redis-server --appendonly yes --requirepass SuperSecuredRedisToken
+    networks:
+      - rayanx-secure-mesh
+    volumes:
+      - rayanx-redis-data:/data
+    restart: always
+
+  # IMMUTABLE DATABASE SECURED LEDGER
+  rayanx-mongodb:
+    image: mongo:6
+    container_name: rayanx_mongodb_ledger
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=db_admin
+      - MONGO_INITDB_ROOT_PASSWORD=SecuredPassword
+    networks:
+      - rayanx-secure-mesh
+    volumes:
+      - rayanx-mongo-data:/data/db
+    restart: always
+
+networks:
+  rayanx-secure-mesh:
+    driver: bridge
+
+volumes:
+  rayanx-redis-data:
+  rayanx-mongo-data:
