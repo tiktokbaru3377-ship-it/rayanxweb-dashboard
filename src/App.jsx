@@ -1,63 +1,31 @@
-import React, { useEffect } from 'react';
-import { RouterProvider } from 'react-router-dom';
-import { router } from './router';
-import { useAuthStore } from './store/useAuthStore';
-import { useSocketStore } from './store/useSocketStore';
-import { useToastStore } from './store/useToastStore';
-import { auth } from './firebase/config';
-import { onAuthStateChanged } from 'firebase/auth';
-import { ThemeProvider } from './context/ThemeContext';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import ToastContainer from './components/common/ToastContainer';
-import api from './services/api';
+import { useEffect } from 'react';
+import { useAuthStore } from './store/authStore';
+import LoginScreen from './pages/LoginScreen'; // Komponen form Anda
+import DashboardLayout from './components/DashboardLayout'; // Halaman utama dashboard
 
-const queryClient = new QueryClient();
-
-export default function App() {
-  const { setUser, clearAuth, setLoading } = useAuthStore();
-  const { socket, connectSocket, disconnectSocket } = useSocketStore();
-  const addToast = useToastStore((state) => state.addToast);
+function App() {
+  const { isAuthenticated, isAuthenticating, initAuthListener } = useAuthStore();
 
   useEffect(() => {
-    const unsubscribeFromAuthObserver = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        try {
-          const res = await api.get('/auth/me');
-          setUser(firebaseUser, res.data.user.role);
-          await connectSocket();
-        } catch (error) {
-          setUser(firebaseUser, 'Viewer');
-          await connectSocket();
-        }
-      } else {
-        clearAuth();
-        disconnectSocket();
-      }
-      setLoading(false);
-    });
+    // Jalankan listener pemantau token Firebase begitu aplikasi di-boot
+    const unsubscribe = initAuthListener();
+    return () => unsubscribe(); // Bersihkan listener saat unmount untuk mencegah memory leak
+  }, [initAuthListener]);
 
-    return () => unsubscribeFromAuthObserver();
-  }, [setUser, clearAuth, setLoading, connectSocket, disconnectSocket]);
+  // RENDER LOADING SPIN ULTRA LIGHT (Mencegah tampilan HTML kosong saat memproses token)
+  if (isAuthenticating) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-slate-950 font-sans">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-enterprise-500 border-t-transparent"></div>
+          <p className="text-sm font-medium text-slate-400 animate-pulse">Menghubungkan ke Jaringan MDM...</p>
+        </div>
+      </div>
+    );
+  }
 
-  // Pasang Listener Keamanan Global Real-time
-  useEffect(() => {
-    if (!socket) return;
-
-    socket.on('notification_update', (data) => {
-      addToast(`Device [${data.deviceId}] triggered panic signal: ${data.alertContext}`, 'panic');
-    });
-
-    return () => {
-      socket.off('notification_update');
-    };
-  }, [socket, addToast]);
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <RouterProvider router={router} />
-        <ToastContainer /> {/* Pipa peluncur alert mengambang global */}
-      </ThemeProvider>
-    </QueryClientProvider>
-  );
+  // Jika terverifikasi, langsung lempar ke Dashboard. Jika tidak, kunci di halaman Login.
+  return isAuthenticated ? <DashboardLayout /> : <LoginScreen />;
 }
+
+export default App;
