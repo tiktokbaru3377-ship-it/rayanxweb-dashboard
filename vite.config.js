@@ -9,6 +9,8 @@ export default defineConfig({
     alias: {
       '@': resolve(__dirname, 'src'),
     },
+    // Memaksa Vite di Linux Vercel mencari file ini jika jalurnya digantung tanpa ekstensi
+    extensions: ['.js', '.jsx', '.json', '.ts', '.tsx']
   },
   build: {
     outDir: 'dist',
@@ -17,7 +19,6 @@ export default defineConfig({
     minify: 'terser',
     rollupOptions: {
       output: {
-        // Serahkan penamaan aset sepenuhnya ke mekanisme internal Vite untuk mencegah kegagalan kompilasi
         chunkFileNames: 'assets/js/[name]-[hash].js',
         entryFileNames: 'assets/js/[name]-[hash].js',
         assetFileNames: 'assets/[ext]/[name]-[hash].[ext]'
