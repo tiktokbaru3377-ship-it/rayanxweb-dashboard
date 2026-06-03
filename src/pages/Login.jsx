@@ -1,116 +1,123 @@
-import React, { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
-import { auth, googleProvider } from '../firebase/config';
-import { useAuthStore } from '../store/useAuthStore';
-import { useNavigate } from 'react-router-dom';
-import api from '../services/api';
+import { useState } from 'react';
+import { 
+  useAuthStore, 
+  useAuthLoading, 
+  useAuthError 
+} from '../store/authStore';
 
-export default function Login() {
-  const { register, handleSubmit, formState: { errors } } = useForm();
-  const [authError, setAuthError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const setUser = useAuthStore(state => state.setUser);
-  const navigate = useNavigate();
+function Login() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  
+  // Mengambil fungsi aksi dan state global dari Zustand Store
+  const loginWithEmail = useAuthStore((state) => state.loginWithEmail);
+  const loginWithGoogle = useAuthStore((state) => state.loginWithGoogle);
+  const isLoading = useAuthLoading();
+  const authError = useAuthError();
 
-  const syncUserRoleAndRedirect = async (firebaseUser) => {
-    try {
-      // Hit backend untuk fetch custom internal user profile role
-      const res = await api.get('/auth/me');
-      setUser(firebaseUser, res.data.user.role);
-    } catch (err) {
-      // Fallback default if not provisioned on db backend yet
-      setUser(firebaseUser, 'Viewer');
-    }
-    navigate('/');
-  };
-
-  const onEmailLogin = async (data) => {
-    setLoading(true);
-    setAuthError('');
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
-      await syncUserRoleAndRedirect(userCredential.user);
-    } catch (err) {
-      setAuthError(err.message.replace('Firebase:', ''));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    try {
-      const result = await signInWithPopup(auth, googleProvider);
-      await syncUserRoleAndRedirect(result.user);
-    } catch (err) {
-      setAuthError(err.message);
-    }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!email || !password) return;
+    
+    // Memicu aksi otentikasi cepat via email
+    await loginWithEmail(email, password);
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 p-6 text-white">
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur-md">
-        <h2 className="text-3xl font-extrabold text-center tracking-tight bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
-          RayanXWeb MDM Core
-        </h2>
-        <p className="mt-2 text-center text-sm text-slate-400">Enterprise Device Management Console</p>
+    <div className="flex min-h-screen items-center justify-center bg-slate-950 p-4 font-sans antialiased">
+      <div className="w-full max-w-md bg-enterprise-darkCard/40 backdrop-blur-md border border-white/10 shadow-2xl rounded-2xl p-8">
         
+        {/* Header Title Console */}
+        <div className="text-center mb-6">
+          <h2 className="text-2xl font-black tracking-tight text-white mb-1">
+            RayanXWeb MDM Core
+          </h2>
+          <p className="text-xs font-medium text-slate-400 tracking-wide">
+            Enterprise Device Management Console
+          </p>
+        </div>
+
+        {/* Kotak Notifikasi Galat Interseptor */}
         {authError && (
-          <div className="mt-4 rounded-lg bg-red-500/10 border border-red-500/20 p-3 text-sm text-red-400 text-center">
+          <div className="mb-5 bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-medium rounded-lg p-3 text-center animate-pulse">
             {authError}
           </div>
         )}
 
-        <form onSubmit={handleSubmit(onEmailLogin)} className="mt-6 space-y-4">
+        {/* Form Otentikasi Utama */}
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold uppercase text-slate-400">Email Address</label>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+              Email Address
+            </label>
             <input 
-              {...register('email', { required: 'Email identity is required' })}
               type="email" 
-              className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 p-3 text-white focus:border-blue-500 focus:outline-none"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-slate-900/60 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-enterprise-500 focus:ring-1 focus:ring-enterprise-500 transition-all disabled:opacity-50"
               placeholder="admin@rayanxweb.app"
+              disabled={isLoading}
+              required
             />
-            {errors.email && <span className="text-xs text-red-400">{errors.email.message}</span>}
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase text-slate-400">Security Password</label>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+              Security Password
+            </label>
             <input 
-              {...register('password', { required: 'Password is required' })}
               type="password" 
-              className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 p-3 text-white focus:border-blue-500 focus:outline-none"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full bg-slate-900/60 border border-white/10 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-enterprise-500 focus:ring-1 focus:ring-enterprise-500 transition-all disabled:opacity-50"
               placeholder="••••••••"
+              disabled={isLoading}
+              required
             />
-            {errors.password && <span className="text-xs text-red-400">{errors.password.message}</span>}
           </div>
 
           <button 
-            disabled={loading}
-            type="submit" 
-            className="w-full mt-2 rounded-lg bg-blue-600 p-3 font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
+            type="submit"
+            disabled={isLoading}
+            className="w-full bg-enterprise-500 hover:bg-enterprise-600 disabled:bg-slate-800 text-white font-semibold rounded-lg py-2.5 text-sm transition-all shadow-lg shadow-enterprise-500/20 active:scale-[0.99] disabled:pointer-events-none"
           >
-            {loading ? 'Decrypting Session...' : 'Authenticate Access'}
+            {isLoading ? (
+              <div className="flex items-center justify-center gap-2">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                <span>Verifying Credentials...</span>
+              </div>
+            ) : (
+              'Authenticate Access'
+            )}
           </button>
         </form>
 
-        <div className="relative my-6 flex items-center justify-center">
-          <div className="absolute w-full border-t border-white/10"></div>
-          <span className="relative bg-slate-900 px-3 text-xs text-slate-500 uppercase">Or Federated Auth</span>
+        {/* Pembatas Alur Otentikasi Federasi */}
+        <div className="relative my-6 text-center">
+          <span className="absolute inset-x-0 top-1/2 h-px bg-white/10 -translate-y-1/2"></span>
+          <span className="relative bg-[#0d1527] px-3 text-[10px] text-slate-500 uppercase tracking-widest font-black">
+            Or Federated Auth
+          </span>
         </div>
 
-        <button 
-          onClick={handleGoogleLogin}
-          className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 p-3 font-medium transition hover:bg-white/10"
+        {/* Tombol Penyedia Identitas Google */}
+        <button
+          onClick={loginWithGoogle}
+          disabled={isLoading}
+          type="button"
+          className="w-full flex items-center justify-center gap-3 bg-slate-900 border border-white/10 hover:bg-slate-800 text-white rounded-lg py-2.5 text-sm font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none"
         >
-          <svg className="h-5 w-5" viewBox="0 0 24 24">
-            <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.61 15.01 1 12 1 7.24 1 3.2 3.74 1.25 7.75l3.83 2.97C6.01 7.27 8.78 5.04 12 5.04z"/>
-            <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.42 3.57v2.97h3.89c2.28-2.1 3.56-5.19 3.56-8.69z"/>
-            <path fill="#FBBC05" d="M5.08 14.72c-.24-.72-.38-1.49-.38-2.28s.14-1.56.38-2.28L1.25 7.19C.45 8.79 0 10.59 0 12.5s.45 3.71 1.25 5.31l3.83-3.09z"/>
-            <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.92l-3.89-2.97c-1.08.72-2.46 1.16-4.07 1.16-3.22 0-5.99-2.23-6.96-5.23L1.21 16.1C3.16 20.1 7.21 23 12 23z"/>
-          </svg>
-          Identity Provider Google
+          <img 
+            src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" 
+            alt="Google Provider" 
+            className="w-4 h-4" 
+          />
+          <span>Identity Provider Google</span>
         </button>
+
       </div>
     </div>
   );
-        }
+}
+
+export default Login;
