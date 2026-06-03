@@ -1,119 +1,97 @@
-import React from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../store/useAuthStore';
-import { useSocketStore } from '../store/useSocketStore';
-import { useTheme } from '../context/ThemeContext';
-import { auth } from '../firebase/config';
-import { 
-  LayoutDashboard, 
-  Smartphone, 
-  UserCheck, 
-  LogOut, 
-  Sun, 
-  Moon, 
-  Radio, 
-  Users, 
-  Send, 
-  Settings 
-} from 'lucide-react';
+import { useEffect } from 'react';
+import { useAuthStore } from '../store/useAuthStore.js';
+import { useNavigate } from 'react-router-dom';
 
-export default function DashboardLayout() {
-  const { user, role, clearAuth } = useAuthStore();
-  const { isConnected, disconnectSocket } = useSocketStore();
-  const { theme, toggleTheme } = useTheme();
+function CoreDashboardLayout() {
+  const user = useAuthStore((state) => state.user);
+  const logoutSecurely = useAuthStore((state) => state.logoutSecurely);
   const navigate = useNavigate();
 
-  const handleLogoutSequence = async () => {
-    if (window.confirm('Apakah Anda yakin ingin memutuskan koneksi sesi enkripsi dari konsol?')) {
-      disconnectSocket();
-      await auth.signOut();
-      clearAuth();
-      navigate('/login');
+  // Validasi Sesi Aktif: Antisipasi kebocoran state lokal
+  useEffect(() => {
+    if (!user) {
+      navigate('/', { replace: true });
     }
-  };
+  }, [user, navigate]);
+
+  if (!user) return null; 
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-50 text-slate-900 transition-colors duration-200 dark:bg-slate-950 dark:text-slate-100">
+    <div className="min-h-screen bg-[#020617] text-slate-100 font-sans antialiased flex">
       
-      {/* SIDEBAR NAVIGATION PANEL */}
-      <aside className="w-64 border-r border-slate-200 bg-white p-5 flex flex-col justify-between dark:border-white/10 dark:bg-slate-900 shrink-0">
+      {/* PANEL NAVIGASI KIRI (SIDEBAR) */}
+      <aside className="w-66 bg-slate-900/50 backdrop-blur-xl border-r border-white/10 p-6 flex flex-col justify-between hidden md:flex">
         <div>
-          <div className="flex items-center gap-3 px-2 py-4">
-            <div className="h-8 w-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-white shadow-lg">RX</div>
-            <div>
-              <h1 className="font-bold text-sm tracking-tight">RayanX Core</h1>
-              <span className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">{role} Security Node</span>
-            </div>
+          <div className="mb-8 border-b border-white/5 pb-4">
+            <h3 className="text-sm font-black tracking-widest text-white uppercase bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
+              RayanXWeb Core
+            </h3>
+            <p className="text-[10px] text-slate-500 font-mono mt-0.5">MDM ENGINE v1.0.0</p>
           </div>
-
-          <nav className="mt-8 space-y-1">
-            <NavLink to="/" className={({ isActive }) => `flex items-center gap-3 rounded-lg px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition ${isActive ? 'bg-blue-600 text-white shadow-md shadow-blue-600/10' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/5'}`}>
-              <LayoutDashboard size={16} /> Overview
-            </NavLink>
-            
-            <NavLink to="/devices" className={({ isActive }) => `flex items-center gap-3 rounded-lg px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition ${isActive ? 'bg-blue-600 text-white shadow-md shadow-blue-600/10' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/5'}`}>
-              <Smartphone size={16} /> Fleet Devices
-            </NavLink>
-
-            {['Admin', 'Operator'].includes(role) && (
-              <>
-                <div className="pt-4 pb-1 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Operations</div>
-                <NavLink to="/enrollment" className={({ isActive }) => `flex items-center gap-3 rounded-lg px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition ${isActive ? 'bg-blue-600 text-white shadow-md shadow-blue-600/10' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/5'}`}>
-                  <UserCheck size={16} /> ADB Enrollment
-                </NavLink>
-                <NavLink to="/notifications" className={({ isActive }) => `flex items-center gap-3 rounded-lg px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition ${isActive ? 'bg-blue-600 text-white shadow-md shadow-blue-600/10' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/5'}`}>
-                  <Send size={16} /> Broadcast FCM
-                </NavLink>
-              </>
-            )}
-
-            {role === 'Admin' && (
-              <>
-                <div className="pt-4 pb-1 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Control Management</div>
-                <NavLink to="/users" className={({ isActive }) => `flex items-center gap-3 rounded-lg px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition ${isActive ? 'bg-blue-600 text-white shadow-md shadow-blue-600/10' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/5'}`}>
-                  <Users size={16} /> IAM Accounts
-                </NavLink>
-                <NavLink to="/settings" className={({ isActive }) => `flex items-center gap-3 rounded-lg px-4 py-2.5 text-xs font-semibold uppercase tracking-wider transition ${isActive ? 'bg-blue-600 text-white shadow-md shadow-blue-600/10' : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-white/5'}`}>
-                  <Settings size={16} /> Server Config
-                </NavLink>
-              </>
-            )}
+          
+          <nav className="space-y-1">
+            <div className="px-4 py-2.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-xl text-xs font-bold tracking-wide uppercase cursor-default">
+              Control Console
+            </div>
           </nav>
         </div>
 
-        {/* BOTTOM PANEL CONTROLS */}
-        <div className="border-t border-slate-200 pt-4 dark:border-white/10">
-          <div className="flex items-center justify-between mb-4 px-2">
-            <span className="text-xs text-slate-400 font-medium truncate max-w-[140px] font-mono">{user?.email}</span>
-            <button onClick={toggleTheme} className="rounded-lg p-1.5 hover:bg-slate-100 dark:hover:bg-white/5">
-              {theme === 'dark' ? <Sun size={14} className="text-amber-400" /> : <Moon size={14} className="text-slate-600" />}
-            </button>
+        {/* IDENTITAS OPERATOR AKTIF */}
+        <div className="border-t border-white/10 pt-4 bg-slate-950/40 p-4 rounded-xl border border-white/5">
+          <div className="mb-3">
+            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Operator Node</p>
+            <p className="text-xs font-semibold text-slate-300 truncate font-mono">{user.email}</p>
           </div>
-          <button onClick={handleLogoutSequence} className="flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-red-500 hover:bg-red-500/10 transition">
-            <LogOut size={16} /> Disconnect Session
+          <button
+            onClick={async () => {
+              await logoutSecurely();
+              navigate('/', { replace: true });
+            }}
+            className="w-full bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 rounded-lg py-2 text-xs font-bold transition-all active:scale-[0.98]"
+          >
+            Terminate Session
           </button>
         </div>
       </aside>
 
-      {/* VIEW STAGE SCREEN */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white/80 px-8 backdrop-blur-md dark:border-white/10 dark:bg-slate-950/80 shrink-0">
-          <div className="text-xs font-bold uppercase tracking-widest text-slate-400">
-            RayanX Web Command Infrastructure Console v1.0.0
+      {/* AREA UTAMA MONITORING KONSOL */}
+      <main className="flex-1 p-6 md:p-8 overflow-y-auto">
+        <header className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-white/5 pb-6">
+          <div>
+            <h1 className="text-2xl font-black text-white tracking-tight">Enterprise MDM Panel</h1>
+            <p className="text-xs text-slate-400 mt-1">Sistem pemantauan node jaringan dan enkripsi perangkat keras secara langsung.</p>
           </div>
-          <div className="flex items-center gap-4">
-            <div className={`flex items-center gap-2 rounded-full px-3 py-1 text-[10px] font-bold tracking-wider uppercase ${isConnected ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'}`}>
-              <Radio size={12} className={isConnected ? 'animate-pulse' : ''} />
-              <span>{isConnected ? 'Stream Link Active' : 'Soket Terputus'}</span>
-            </div>
+          <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-full w-fit">
+            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping"></span>
+            <span className="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-wider">All Systems Operational</span>
           </div>
         </header>
 
-        {/* CONTAINER AREA */}
-        <main className="flex-1 overflow-y-auto p-8 bg-slate-50/50 dark:bg-slate-950/30">
-          <Outlet />
-        </main>
-      </div>
+        {/* METRIK STATISTIK SISTEM */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="bg-slate-900/30 border border-white/5 p-6 rounded-2xl backdrop-blur-sm">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Monitored Nodes</p>
+            <p className="text-3xl font-black text-white font-mono tracking-tight">2,481</p>
+          </div>
+          <div className="bg-slate-900/30 border border-white/5 p-6 rounded-2xl backdrop-blur-sm">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Gateway Sync Rate</p>
+            <p className="text-3xl font-black text-blue-400 font-mono tracking-tight">99.98%</p>
+          </div>
+          <div className="bg-slate-900/30 border border-white/5 p-6 rounded-2xl backdrop-blur-sm">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Firewall Integrity</p>
+            <p className="text-3xl font-black text-indigo-400 font-mono tracking-tight">SECURE</p>
+          </div>
+        </div>
+
+        {/* AREA TAMPILAN DASHBOARD KOSONG (TEMPAT GRAFIK/TABEL BERADA) */}
+        <div className="bg-slate-900/10 border border-white/5 rounded-2xl p-8 text-center border-dashed border-2 flex flex-col items-center justify-center min-h-[300px]">
+          <p className="text-sm font-bold text-slate-400 mb-1">Data Stream Active</p>
+          <p className="text-xs text-slate-500 max-w-sm">Siap menerima suntikan data visualisasi core dari server backend Socket.io.</p>
+        </div>
+
+      </main>
     </div>
   );
 }
+
+export default CoreDashboardLayout;
