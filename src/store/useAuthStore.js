@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { auth, googleProvider } from '../firebase/config';
+import { auth, googleProvider } from '../firebase/config.js';
 import { signInWithEmailAndPassword, signInWithPopup, signOut, onIdTokenChanged } from 'firebase/auth';
 
 export const useAuthStore = create((set) => ({
