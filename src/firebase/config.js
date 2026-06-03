@@ -7,15 +7,14 @@ const firebaseConfig = {
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-// Validasi Keberadaan Kunci Enkripsi Sebelum Proses Booting Aplikasi
-if (!firebaseConfig.apiKey) {
-  throw new Error('=== CRITICAL RESOURCE FAULT ===\nFirebase API Key is missing inside environment variables orchestration.');
-}
-
+// Inisialisasi Aplikasi Firebase
 const app = initializeApp(firebaseConfig);
+
+// Ekspor Instans Otentikasi dengan Nama yang Jelas
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+
+export default app;
