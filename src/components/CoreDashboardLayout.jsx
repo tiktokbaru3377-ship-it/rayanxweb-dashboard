@@ -405,4 +405,117 @@ function CoreDashboardLayout() {
                               ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
                               : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                           }`}>
-                            {node
+                            {node.status === 'Active' ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+                            {node.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ================= VIEW: LIVE ADB SHELL COMMAND INTERACTION ================= */}
+        {activeTab === 'terminal' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* Kolom Kiri: Pilihan Target Perangkat Node */}
+            <div className="bg-slate-900/30 border border-white/5 p-5 rounded-2xl backdrop-blur-sm h-fit">
+              <h3 className="text-sm font-bold text-white tracking-wide uppercase mb-3">Target Node Selector</h3>
+              <p className="text-xs text-slate-400 mb-4">Pilih perangkat keras MDM aktif sebelum melakukan injeksi payload ADB shell script.</p>
+              
+              <div className="space-y-2">
+                {deviceStatus.map((dev) => (
+                  <button
+                    key={dev.id}
+                    onClick={() => setSelectedDevice(dev)}
+                    className={`w-full p-4 rounded-xl border text-left transition-all flex items-center justify-between ${
+                      selectedDevice?.id === dev.id
+                        ? 'bg-blue-600/10 border-blue-500 text-white shadow-lg'
+                        : 'bg-slate-950/40 border-white/5 text-slate-400 hover:border-white/10'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <Smartphone className={`h-5 w-5 ${selectedDevice?.id === dev.id ? 'text-blue-400' : 'text-slate-500'}`} />
+                      <div className="overflow-hidden">
+                        <p className="text-xs font-bold text-white truncate">{dev.name}</p>
+                        <p className="text-[10px] font-mono text-slate-500 mt-0.5">{dev.id} • {dev.ip}</p>
+                      </div>
+                    </div>
+                    <span className={`h-2 w-2 rounded-full flex-shrink-0 ${dev.status === 'Active' ? 'bg-emerald-400' : 'bg-amber-400'}`}></span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Kolom Kanan: Jendela Konsol Terminal Interaktif */}
+            <div className="lg:col-span-2 bg-slate-950 border border-white/10 rounded-2xl flex flex-col h-[520px] shadow-2xl overflow-hidden">
+              {/* Header Terminal */}
+              <div className="bg-slate-900/80 px-5 py-3.5 border-b border-white/5 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex gap-1.5">
+                    <span className="h-3 w-3 rounded-full bg-red-500/40 border border-red-500/50"></span>
+                    <span className="h-3 w-3 rounded-full bg-amber-500/40 border border-amber-500/50"></span>
+                    <span className="h-3 w-3 rounded-full bg-emerald-500/40 border border-emerald-500/50"></span>
+                  </div>
+                  <span className="text-xs font-mono font-bold text-slate-400 ml-2">
+                    adb_pipeline@{selectedDevice ? selectedDevice.id.toLowerCase() : 'node_offline'}: ~
+                  </span>
+                </div>
+                <span className="text-[10px] bg-blue-500/10 border border-blue-500/20 text-blue-400 px-2 py-0.5 rounded font-mono">
+                  WSS ENCRYPTED
+                </span>
+              </div>
+
+              {/* Log Output Jendela Terminal */}
+              <div className="flex-1 p-5 overflow-y-auto font-mono text-xs text-slate-300 space-y-1.5 selection:bg-blue-500/30">
+                {adbLogs.map((log, index) => (
+                  <div 
+                    key={index} 
+                    className={`whitespace-pre-wrap leading-relaxed ${
+                      log.startsWith('$') ? 'text-blue-400 font-bold' : 
+                      log.startsWith('[ERROR]') ? 'text-red-400' : 
+                      log.startsWith('[SYSTEM]') ? 'text-purple-400' : 'text-slate-300'
+                    }`}
+                  >
+                    {log}
+                  </div>
+                ))}
+                <div ref={terminalEndRef} />
+              </div>
+
+              {/* Baris Input Perintah Shell Injection */}
+              <form onSubmit={handleSendAdbCommand} className="p-4 bg-slate-900/40 border-t border-white/5 flex gap-3">
+                <div className="flex-1 bg-slate-950 rounded-xl border border-white/10 px-4 flex items-center focus-within:border-blue-500 transition-colors">
+                  <span className="text-blue-500 font-mono text-xs font-bold mr-2 select-none">$</span>
+                  <input
+                    type="text"
+                    value={adbCommand}
+                    onChange={(e) => setAdbCommand(e.target.value)}
+                    disabled={!selectedDevice}
+                    placeholder={selectedDevice ? `Masukkan perintah ADB untuk shell ${selectedDevice.id}...` : "Silakan pilih target perangkat."}
+                    className="w-full bg-transparent border-none outline-none py-3 font-mono text-xs text-white placeholder-slate-600 disabled:cursor-not-allowed"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={!selectedDevice || !adbCommand.trim()}
+                  className="px-5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 text-white disabled:text-slate-600 rounded-xl flex items-center justify-center transition-all active:scale-95 disabled:scale-100"
+                >
+                  <Play className="h-4 w-4 fill-current" />
+                </button>
+              </form>
+            </div>
+
+          </div>
+        )}
+
+      </main>
+    </div>
+  );
+}
+
+export default CoreDashboardLayout;
