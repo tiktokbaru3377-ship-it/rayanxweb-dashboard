@@ -1,10 +1,9 @@
 import { useEffect } from 'react';
+// Menggunakan jalur eksplisit relatif super-aman untuk Linux Vercel
+import { useAuthStore, useAuthLoading, useAuthUser } from './store/authStore.js';
 
-// MENERAPKAN PATH ALIAS: Bypass deteksi relatif Linux Vercel
-import { useAuthStore, useAuthLoading, useAuthUser } from '@/store/authStore';
-
-import Login from '@/pages/Login'; 
-import DashboardLayout from '@/components/DashboardLayout'; 
+import Login from './pages/Login.jsx'; 
+import DashboardLayout from './components/DashboardLayout.jsx'; 
 
 function App() {
   const user = useAuthUser();
@@ -12,11 +11,12 @@ function App() {
   const initAuthListener = useAuthStore((state) => state.initAuthListener);
 
   useEffect(() => {
-    // Jalankan radar pemantau token Firebase Auth
+    // Menyalakan radar pemantau status login token Firebase
     const unsubscribe = initAuthListener();
     return () => unsubscribe(); 
   }, [initAuthListener]);
 
+  // Render loading ring agar aplikasi responsif saat booting awal
   if (isLoading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-[#020617] font-sans">
@@ -30,6 +30,7 @@ function App() {
     );
   }
 
+  // Pengalihan halaman otomatis pasca verifikasi token selesai
   return user ? <DashboardLayout /> : <Login />;
 }
 
