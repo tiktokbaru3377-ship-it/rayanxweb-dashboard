@@ -1,10 +1,10 @@
 import { useState } from 'react';
-// Menggunakan pemanggilan relatif murni yang terjamin lolos kompilasi Rollup Vercel
+// Mundur satu direktori menggunakan ../ menuju file useAuthStore.js
 import { 
   useAuthStore, 
   useAuthLoading, 
   useAuthError 
-} from '../store/authStore.js';
+} from '../store/useAuthStore.js';
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -25,7 +25,6 @@ function Login() {
     <div className="flex min-h-screen items-center justify-center bg-slate-950 p-4 font-sans antialiased">
       <div className="w-full max-w-md bg-enterprise-darkCard/40 backdrop-blur-md border border-white/10 shadow-2xl rounded-2xl p-8">
         
-        {/* Header Title Console */}
         <div className="text-center mb-6">
           <h2 className="text-2xl font-black tracking-tight text-white mb-1">
             RayanXWeb MDM Core
@@ -35,14 +34,12 @@ function Login() {
           </p>
         </div>
 
-        {/* Kotak Notifikasi Galat */}
         {authError && (
           <div className="mb-5 bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-medium rounded-lg p-3 text-center animate-pulse">
             {authError}
           </div>
         )}
 
-        {/* Form Otentikasi Utama */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
@@ -56,7 +53,6 @@ function Login() {
               placeholder="admin@rayanxweb.app"
               disabled={isLoading}
               required
-              autoComplete="username"
             />
           </div>
 
@@ -72,7 +68,6 @@ function Login() {
               placeholder="••••••••"
               disabled={isLoading}
               required
-              autoComplete="current-password"
             />
           </div>
 
@@ -92,7 +87,6 @@ function Login() {
           </button>
         </form>
 
-        {/* Pembatas Alur Otentikasi Federasi */}
         <div className="relative my-6 text-center">
           <span className="absolute inset-x-0 top-1/2 h-px bg-white/10 -translate-y-1/2"></span>
           <span className="relative bg-[#0d1527] px-3 text-[10px] text-slate-500 uppercase tracking-widest font-black">
@@ -100,7 +94,6 @@ function Login() {
           </span>
         </div>
 
-        {/* Tombol Penyedia Identitas Google */}
         <button
           onClick={loginWithGoogle}
           disabled={isLoading}
