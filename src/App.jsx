@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
-// Menggunakan jalur eksplisit relatif super-aman untuk Linux Vercel
-import { useAuthStore, useAuthLoading, useAuthUser } from './store/authStore.js';
+// Hubungkan ke nama file baru secara eksplisit
+import { useAuthStore, useAuthLoading, useAuthUser } from './store/useAuthStore.js';
 
 import Login from './pages/Login.jsx'; 
 import DashboardLayout from './components/DashboardLayout.jsx'; 
@@ -11,12 +11,10 @@ function App() {
   const initAuthListener = useAuthStore((state) => state.initAuthListener);
 
   useEffect(() => {
-    // Menyalakan radar pemantau status login token Firebase
     const unsubscribe = initAuthListener();
     return () => unsubscribe(); 
   }, [initAuthListener]);
 
-  // Render loading ring agar aplikasi responsif saat booting awal
   if (isLoading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-[#020617] font-sans">
@@ -30,7 +28,6 @@ function App() {
     );
   }
 
-  // Pengalihan halaman otomatis pasca verifikasi token selesai
   return user ? <DashboardLayout /> : <Login />;
 }
 
