@@ -1,50 +1,163 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useAuthStore } from '../store/useAuthStore.js';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import { io } from 'socket.io-client';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   BarChart, Bar, AreaChart, Area
 } from 'recharts';
 import { 
-  LayoutDashboard, Server, Shield, Radio, Power, LogOut, 
-  RefreshCw, Terminal, Activity, Cpu, HardDrive
+  LayoutDashboard, Server, Shield, Radio, LogOut, 
+  RefreshCw, Terminal, Activity, Cpu, HardDrive,
+  Sliders, Smartphone, CheckCircle2, AlertTriangle, Play
 } from 'lucide-react';
 
-// DATA SIMULASI TELEMETRI MDM (Aman untuk Rendering Awal / No-SSR / Client Production)
-const networkDataMock = [
-  { time: '09:00', traffic: 120, cpu: 45, memory: 62 },
-  { time: '09:05', traffic: 240, cpu: 55, memory: 64 },
-  { time: '09:10', traffic: 180, cpu: 48, memory: 61 },
-  { time: '09:15', traffic: 380, cpu: 78, memory: 75 },
-  { time: '09:20', traffic: 410, cpu: 85, memory: 80 },
-  { time: '09:25', traffic: 320, cpu: 65, memory: 72 },
-  { time: '09:30', traffic: 490, cpu: 92, memory: 88 },
-];
-
-const deviceStatusMock = [
-  { id: 'NODE-0X91', name: 'Singapore Gateway Edge', type: 'Relay Router', status: 'Active', load: '12%', ip: '139.99.12.82' },
-  { id: 'NODE-0X45', name: 'US-East Core Server', type: 'Mainframe Compute', status: 'Active', load: '68%', ip: '142.250.74.46' },
-  { id: 'NODE-0X23', name: 'Jakarta Database Relay', type: 'SQL Replication', status: 'Syncing', load: '45%', ip: '103.247.22.10' },
-  { id: 'NODE-0X88', name: 'Backup Storage Area', type: 'Encrypted NAS', status: 'Standby', load: '2%', ip: '192.168.40.15' },
-];
+// =========================================================================
+// MAPPING VARIABEL LINGKUNGAN VITE (DIINJEKSI LANGSUNG DARI DASBOR VERCEL)
+// =========================================================================
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/v1';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'ws://localhost:5000';
 
 function CoreDashboardLayout() {
   const user = useAuthStore((state) => state.user);
   const logoutSecurely = useAuthStore((state) => state.logoutSecurely);
   const navigate = useNavigate();
+  
+  // Tab Navigation State
   const [activeTab, setActiveTab] = useState('overview');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // State Data HTTP (Axios)
+  const [deviceStatus, setDeviceStatus] = useState([]);
+  const [systemStats, setSystemStats] = useState({
+    bandwidth: '0 Gbps',
+    cpuLoad: '0%',
+    storage: '0 TB',
+    activeRelays: '0 / 0'
+  });
 
-  // Proteksi Keras Sesi Login
+  // State Data Real-time (Socket.io)
+  const [networkData, setNetworkData] = useState([]);
+  const [adbLogs, setAdbLogs] = useState(['[SYSTEM] ADB Shell Pipeline initialized. Waiting for device connection...']);
+  const [adbCommand, setAdbCommand] = useState('');
+  const [selectedDevice, setSelectedDevice] = useState(null);
+  
+  const terminalEndRef = useRef(null);
+
+  // Proteksi Keamanan Sesi Sisi Klien
   useEffect(() => {
     if (!user) {
       navigate('/', { replace: true });
     }
   }, [user, navigate]);
 
-  const handleRefresh = () => {
+  // Autoscroll untuk Terminal ADB Shell
+  useEffect(() => {
+    terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [adbLogs]);
+
+  // =========================================================================
+  // 1. PIPELINE REST API FETCHING (AXIOS)
+  // =========================================================================
+  const fetchBackendData = async () => {
+    if (!user) return;
     setIsRefreshing(true);
-    setTimeout(() => setIsRefreshing(false), 800);
+    try {
+      // Fetch Manifest Device List
+      const deviceRes = await axios.get(`${API_URL}/devices`, {
+        headers: { Authorization: `Bearer ${user?.uid}` }
+      });
+      setDeviceStatus(deviceRes.data || []);
+      if (deviceRes.data && deviceRes.data.length > 0 && !selectedDevice) {
+        setSelectedDevice(deviceRes.data[0]);
+      }
+
+      // Fetch Global Infrastructure Statistics Metrics
+      const statsRes = await axios.get(`${API_URL}/stats`, {
+        headers: { Authorization: `Bearer ${user?.uid}` }
+      });
+      setSystemStats(statsRes.data || {
+        bandwidth: '0 Gbps',
+        cpuLoad: '0%',
+        storage: '0 TB',
+        activeRelays: '0 / 0'
+      });
+    } catch (error) {
+      console.error("REST Execution Error:", error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchBackendData();
+    }
+  }, [user]);
+
+  // =========================================================================
+  // 2. PIPELINE WEBSOCKET DATA STREAM (SOCKET.IO)
+  // =========================================================================
+  useEffect(() => {
+    if (!user) return;
+
+    // Inisialisasi Handshake Secure WebSocket
+    const socket = io(SOCKET_URL, {
+      transports: ['websocket'],
+      secure: true,
+      auth: { token: user.uid }
+    });
+
+    // Mendengarkan Aliran Data Telemetri Real-time (Charts)
+    socket.on('telemetry-stream', (incomingData) => {
+      setNetworkData((prevData) => {
+        const updatedData = [...prevData, incomingData];
+        // Batasi maksimal 12 baris data di memori untuk menjaga performa rendering
+        return updatedData.length > 12 ? updatedData.slice(1) : updatedData;
+      });
+    });
+
+    // Mendengarkan Log Keluaran Eksekusi ADB Shell
+    socket.on('adb-terminal-output', (logLine) => {
+      setAdbLogs((prevLogs) => [...prevLogs, logLine]);
+    });
+
+    // Mendengarkan Perubahan Mutasi Status Node dari Server
+    socket.on('node-status-change', (updatedNode) => {
+      setDeviceStatus((prevDevices) => 
+        prevDevices.map((device) => 
+          device.id === updatedNode.id ? { ...device, ...updatedNode } : device
+        )
+      );
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [user]);
+
+  // =========================================================================
+  // 3. FUNGSI EKSEKUSI UTST (ADB COMMAND INJECTION)
+  // =========================================================================
+  const handleSendAdbCommand = async (e) => {
+    e.preventDefault();
+    if (!adbCommand.trim() || !selectedDevice) return;
+
+    const cmd = adbCommand;
+    setAdbLogs((prev) => [...prev, `$ ${selectedDevice.id}: ${cmd}`]);
+    setAdbCommand('');
+
+    try {
+      await axios.post(`${API_URL}/adb/execute`, {
+        deviceId: selectedDevice.id,
+        command: cmd
+      }, {
+        headers: { Authorization: `Bearer ${user?.uid}` }
+      });
+    } catch (error) {
+      setAdbLogs((prev) => [...prev, `[ERROR] Failed to dispatch payload command to network node.`]);
+    }
   };
 
   if (!user) return null;
@@ -52,23 +165,21 @@ function CoreDashboardLayout() {
   return (
     <div className="min-h-screen bg-[#020617] text-slate-100 font-sans antialiased flex flex-col md:flex-row">
       
-      {/* ================= REKAYASA SIDEBAR NAVIGASI ================= */}
+      {/* ================= SIDEBAR NAVIGASI PANEL ================= */}
       <aside className="w-full md:w-64 bg-slate-900/60 backdrop-blur-xl border-b md:border-b-0 md:border-r border-white/10 p-5 flex flex-col justify-between">
         <div>
-          {/* Header Console Identity */}
+          {/* Brand Identity */}
           <div className="mb-8 border-b border-white/5 pb-4 flex items-center gap-3">
             <div className="h-9 w-9 rounded-xl bg-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
               <Shield className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h3 className="text-sm font-black tracking-widest text-white uppercase">
-                RayanXWeb
-              </h3>
-              <p className="text-[10px] text-blue-400 font-mono font-bold tracking-wider">MDM CORE CONSOLE</p>
+              <h3 className="text-sm font-black tracking-widest text-white uppercase">RayanXWeb</h3>
+              <p className="text-[10px] text-blue-400 font-mono font-bold tracking-wider">ENTERPRISE CONSOLE</p>
             </div>
           </div>
           
-          {/* Menu Items */}
+          {/* Navigasi Bilah Samping */}
           <nav className="space-y-1.5">
             <button 
               onClick={() => setActiveTab('overview')}
@@ -79,7 +190,7 @@ function CoreDashboardLayout() {
               }`}
             >
               <LayoutDashboard className="h-4 w-4" />
-              <span>Core Overview</span>
+              <span>Core Infrastructure</span>
             </button>
             
             <button 
@@ -91,17 +202,29 @@ function CoreDashboardLayout() {
               }`}
             >
               <Server className="h-4 w-4" />
-              <span>Node Management</span>
+              <span>Node Manifest</span>
+            </button>
+
+            <button 
+              onClick={() => setActiveTab('terminal')}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
+                activeTab === 'terminal' 
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/10' 
+                  : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
+              }`}
+            >
+              <Terminal className="h-4 w-4" />
+              <span>ADB Shell Pipeline</span>
             </button>
           </nav>
         </div>
 
-        {/* Info Operator & Sakelar Sesi Keluar */}
+        {/* Info Aktif Sesi Operator */}
         <div className="border-t border-white/10 pt-4 mt-6 md:mt-0 bg-slate-950/40 p-3.5 rounded-xl border border-white/5">
           <div className="mb-3 flex items-center gap-2.5">
             <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></div>
             <div className="overflow-hidden">
-              <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Active Operator</p>
+              <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Operator Node</p>
               <p className="text-xs font-semibold text-slate-300 truncate font-mono">{user.email}</p>
             </div>
           </div>
@@ -118,32 +241,33 @@ function CoreDashboardLayout() {
         </div>
       </aside>
 
-      {/* ================= AREA KONTEN UTAMA OPERASIONAL ================= */}
+      {/* ================= AREA UTAMA OPERASIONAL CONTROLLER ================= */}
       <main className="flex-1 p-6 md:p-8 overflow-y-auto">
         
-        {/* Top Floating Dashboard Bar */}
+        {/* Floating Top Bar Dashboard */}
         <header className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-white/5 pb-6">
           <div>
             <h1 className="text-2xl font-black text-white tracking-tight">System Infrastructure Command</h1>
-            <p className="text-xs text-slate-400 mt-1">Monitoring dan kontrol kluster infrastruktur global secara terenkripsi.</p>
+            <p className="text-xs text-slate-400 mt-1">Terhubung murni menggunakan REST API Kluster & Secure WebSocket Link.</p>
           </div>
           <div className="flex items-center gap-3">
             <button 
-              onClick={handleRefresh}
+              onClick={fetchBackendData}
               className="p-2.5 bg-slate-900 border border-white/10 hover:bg-slate-800 text-slate-300 rounded-xl transition-all"
             >
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
-            <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-xl">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-              <span className="text-[10px] font-mono font-bold text-emerald-400 uppercase tracking-wider">Secure State</span>
+            <div className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 px-3 py-1.5 rounded-xl">
+              <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-ping"></span>
+              <span className="text-[10px] font-mono font-bold text-blue-400 uppercase tracking-wider">Live API Tunnel</span>
             </div>
           </div>
         </header>
 
+        {/* ================= VIEW: OVERVIEW (METRICS + CHARTS) ================= */}
         {activeTab === 'overview' && (
           <>
-            {/* GRID TELEMETRI UTAMA */}
+            {/* GRID TELEMETRI STATISTIK KONSOL */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
               <div className="bg-slate-900/30 border border-white/5 p-5 rounded-2xl backdrop-blur-sm flex items-center gap-4">
                 <div className="h-10 w-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
@@ -151,7 +275,7 @@ function CoreDashboardLayout() {
                 </div>
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Network Bandwidth</p>
-                  <p className="text-2xl font-black text-white font-mono mt-0.5">4.9 Gbps</p>
+                  <p className="text-2xl font-black text-white font-mono mt-0.5">{systemStats.bandwidth}</p>
                 </div>
               </div>
               <div className="bg-slate-900/30 border border-white/5 p-5 rounded-2xl backdrop-blur-sm flex items-center gap-4">
@@ -160,7 +284,7 @@ function CoreDashboardLayout() {
                 </div>
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Cluster CPU Load</p>
-                  <p className="text-2xl font-black text-white font-mono mt-0.5">64.2%</p>
+                  <p className="text-2xl font-black text-white font-mono mt-0.5">{systemStats.cpuLoad}</p>
                 </div>
               </div>
               <div className="bg-slate-900/30 border border-white/5 p-5 rounded-2xl backdrop-blur-sm flex items-center gap-4">
@@ -169,7 +293,7 @@ function CoreDashboardLayout() {
                 </div>
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Storage Array</p>
-                  <p className="text-2xl font-black text-white font-mono mt-0.5">81.4 TB</p>
+                  <p className="text-2xl font-black text-white font-mono mt-0.5">{systemStats.storage}</p>
                 </div>
               </div>
               <div className="bg-slate-900/30 border border-white/5 p-5 rounded-2xl backdrop-blur-sm flex items-center gap-4">
@@ -178,23 +302,22 @@ function CoreDashboardLayout() {
                 </div>
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Relays</p>
-                  <p className="text-2xl font-black text-emerald-400 font-mono mt-0.5">182 / 182</p>
+                  <p className="text-2xl font-black text-emerald-400 font-mono mt-0.5">{systemStats.activeRelays}</p>
                 </div>
               </div>
             </div>
 
-            {/* SEKTOR ANALISIS GRAFIK VISUALISASI */}
+            {/* SEKTOR SEBARAN VISUALISASI GRAFIK REAL-TIME */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-              {/* Grafik Garis - Lalu Lintas Jaringan */}
+              {/* Grafik Aliran Bandwidth Jaringan */}
               <div className="bg-slate-900/30 border border-white/5 p-5 rounded-2xl backdrop-blur-sm">
                 <div className="mb-4">
                   <h3 className="text-sm font-bold text-white tracking-wide uppercase">Core Network Real-Time Stream</h3>
-                  <p className="text-[11px] text-slate-400">Data lalu lintas kilas balik 30 menit terakhir.</p>
+                  <p className="text-[11px] text-slate-400">Injeksi data langsung per detik dari WebSocket pipeline.</p>
                 </div>
-                {/* PRO-TIP PRODUCTION: Tinggi kaku h-[280px] mencegah Recharts crash atau mengalami blank rendering */}
                 <div className="w-full h-[280px] text-xs font-mono">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={networkDataMock} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <AreaChart data={networkData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                       <defs>
                         <linearGradient id="colorTraffic" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3}/>
@@ -211,15 +334,15 @@ function CoreDashboardLayout() {
                 </div>
               </div>
 
-              {/* Grafik Batang - Beban CPU & Memori */}
+              {/* Grafik Alokasi Beban Hardware Komputasi */}
               <div className="bg-slate-900/30 border border-white/5 p-5 rounded-2xl backdrop-blur-sm">
                 <div className="mb-4">
                   <h3 className="text-sm font-bold text-white tracking-wide uppercase">Node Computing Telemetry</h3>
-                  <p className="text-[11px] text-slate-400">Beban komputasi CPU berbanding alokasi memori kluster.</p>
+                  <p className="text-[11px] text-slate-400">Fluktuasi beban CPU kluster dan ketersediaan memori server.</p>
                 </div>
                 <div className="w-full h-[280px] text-xs font-mono">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={networkDataMock} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <BarChart data={networkData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
                       <XAxis dataKey="time" stroke="#64748b" />
                       <YAxis stroke="#64748b" />
@@ -235,17 +358,17 @@ function CoreDashboardLayout() {
           </>
         )}
 
-        {/* PANEL MANIFEST NODE PERANGKAT (TABEL DATA) */}
+        {/* ================= VIEW: MANIFEST DATA DEVICES (TABEL REST) ================= */}
         {(activeTab === 'overview' || activeTab === 'devices') && (
-          <div className="bg-slate-900/30 border border-white/5 rounded-2xl backdrop-blur-sm overflow-hidden border border-white/5">
+          <div className="bg-slate-900/30 border border-white/5 rounded-2xl backdrop-blur-sm overflow-hidden mb-8">
             <div className="p-5 border-b border-white/5 flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-bold text-white tracking-wide uppercase">Active Edge Cluster Nodes</h3>
-                <p className="text-[11px] text-slate-400">Daftar perangkat gateway MDM operasional terpantau.</p>
+                <p className="text-[11px] text-slate-400">Manifes pemantauan perangkat keras MDM terhubung database.</p>
               </div>
               <div className="p-1.5 bg-slate-950 border border-white/10 text-slate-400 rounded-lg text-xs font-mono flex items-center gap-1.5">
-                <Terminal className="h-3.5 w-3.5 text-blue-400" />
-                <span>Status: Synced</span>
+                <Sliders className="h-3.5 w-3.5 text-blue-400" />
+                <span>REST Status: Synced</span>
               </div>
             </div>
             
@@ -262,33 +385,24 @@ function CoreDashboardLayout() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5 font-mono">
-                  {deviceStatusMock.map((node, i) => (
-                    <tr key={i} className="hover:bg-white/[0.02] transition-colors text-slate-300">
-                      <td className="p-4 font-bold text-blue-400">{node.id}</td>
-                      <td className="p-4 text-white font-sans font-semibold">{node.name}</td>
-                      <td className="p-4 text-slate-400">{node.type}</td>
-                      <td className="p-4">{node.ip}</td>
-                      <td className="p-4">{node.load}</td>
-                      <td className="p-4 text-right">
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                          node.status === 'Active' 
-                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                            : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                        }`}>
-                          {node.status}
-                        </span>
+                  {deviceStatus.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="p-8 text-center text-slate-500 font-sans">
+                        Tidak ada kluster perangkat keras terhubung. Jalankan refresh REST API.
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-      </main>
-    </div>
-  );
-}
-
-export default CoreDashboardLayout;
+                  ) : (
+                    deviceStatus.map((node, i) => (
+                      <tr key={i} className="hover:bg-white/[0.02] transition-colors text-slate-300">
+                        <td className="p-4 font-bold text-blue-400">{node.id}</td>
+                        <td className="p-4 text-white font-sans font-semibold">{node.name}</td>
+                        <td className="p-4 text-slate-400">{node.type}</td>
+                        <td className="p-4">{node.ip}</td>
+                        <td className="p-4">{node.load}</td>
+                        <td className="p-4 text-right">
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1 ${
+                            node.status === 'Active' 
+                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                              : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                          }`}>
+                            {node
