@@ -1,11 +1,9 @@
 import { useEffect } from 'react';
-// Menggunakan modul store yang baru dan sudah tervalidasi lolos kompilasi
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore, useAuthLoading, useAuthUser } from './store/useAuthStore.js';
 
 import Login from './pages/Login'; 
-
-// BYPASS STRATEGY: Mengimpor layout menggunakan nama unik baru agar Git terpaksa mendeteksi berkas baru
-import CoreDashboardLayout from './components/CoreDashboardLayout';
+import CoreDashboardLayout from './components/CoreDashboardLayout'; 
 
 function App() {
   const user = useAuthUser();
@@ -13,11 +11,12 @@ function App() {
   const initAuthListener = useAuthStore((state) => state.initAuthListener);
 
   useEffect(() => {
-    // Memantau token otentikasi Firebase secara real-time
+    // Mengaktifkan radar pemantau status sesi otentikasi Firebase
     const unsubscribe = initAuthListener();
     return () => unsubscribe(); 
   }, [initAuthListener]);
 
+  // Skema Layar Tunggu Otentikasi Sentral
   if (isLoading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-[#020617] font-sans">
@@ -31,8 +30,26 @@ function App() {
     );
   }
 
-  // Pengalihan halaman otomatis pasca verifikasi token selesai
-  return user ? <CoreDashboardLayout /> : <Login />;
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* RUTE GERBANG UTAMA: Jika sudah login, paksa lempar ke /dashboard */}
+        <Route 
+          path="/" 
+          element={!user ? <Login /> : <Navigate to="/dashboard" replace />} 
+        />
+        
+        {/* RUTE KONSOL MANAGEMENT: Jika belum login, tendang balik ke halaman awal */}
+        <Route 
+          path="/dashboard" 
+          element={user ? <CoreDashboardLayout /> : <Navigate to="/" replace />} 
+        />
+
+        {/* PROTEKSI EXTRA: Alihkan rute tidak dikenal ke halaman root */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
 export default App;
