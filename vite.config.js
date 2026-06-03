@@ -2,7 +2,6 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 
-// https://vitejs.dev/config/
 export default defineConfig({
   base: '/',
   plugins: [react()],
@@ -18,15 +17,10 @@ export default defineConfig({
     minify: 'terser',
     rollupOptions: {
       output: {
-        // Memaksa penamaan file statis agar konsisten dan mudah dibaca oleh Vercel
-        assetFileNames: (assetInfo) => {
-          if (assetInfo.name && assetInfo.name.endsWith('.css')) {
-            return 'assets/css/index.[ext]'; // Nama file dikunci menjadi assets/css/index.css
-          }
-          return 'assets/[name]-[hash].[ext]';
-        },
+        // Serahkan penamaan aset sepenuhnya ke mekanisme internal Vite untuk mencegah kegagalan kompilasi
         chunkFileNames: 'assets/js/[name]-[hash].js',
         entryFileNames: 'assets/js/[name]-[hash].js',
+        assetFileNames: 'assets/[ext]/[name]-[hash].[ext]'
       },
     },
   },
